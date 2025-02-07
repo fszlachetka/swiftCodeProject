@@ -12,9 +12,9 @@ import (
 func GetSwiftCode(c *gin.Context, db *sql.DB) {
 	code := strings.ToUpper(c.Param("swift-code"))
 	fmt.Println(code)
-	var swiftEntry SwiftCode
 
-	query := `SELECT countryISO2, swift_code, bankName, address, country_name, is_headquarter  FROM swift_codes WHERE swift_code = $1`
+	var swiftEntry SwiftCode
+	query := `SELECT countryISO2, swift_code, bankName, address, country_name, is_headquarter FROM swift_codes WHERE swift_code = $1`
 
 	err := db.QueryRow(query, code).Scan(
 		&swiftEntry.CountryISO2,
@@ -31,13 +31,51 @@ func GetSwiftCode(c *gin.Context, db *sql.DB) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
-	c.JSON(http.StatusOK, swiftEntry)
+
+	if swiftEntry.IsHeadquarter {
+		var branches []SwiftCode
+		branchQuery := `SELECT countryISO2, swift_code, bankName, address, country_name, is_headquarter FROM swift_codes WHERE swift_code LIKE $1 AND swift_code <> $2`
+		rows, err := db.Query(branchQuery, code[:8]+"%", code)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch branches"})
+			return
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var branch SwiftCode
+			if err := rows.Scan(
+				&branch.CountryISO2,
+				&branch.SwiftCode,
+				&branch.BankName,
+				&branch.Address,
+				&branch.CountryName,
+				&branch.IsHeadquarter,
+			); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan branch "})
+				return
+			}
+			branches = append(branches, branch)
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"address":       swiftEntry.Address,
+			"bankName":      swiftEntry.BankName,
+			"countryISO2":   swiftEntry.CountryISO2,
+			"countryName":   swiftEntry.CountryName,
+			"isHeadquarter": swiftEntry.IsHeadquarter,
+			"swiftCode":     swiftEntry.SwiftCode,
+			"branches":      branches,
+		})
+	} else {
+		c.JSON(http.StatusOK, swiftEntry)
+	}
 }
 
 // GET /v1/swift-codes/country/:countryISO2
 func GetSwiftCodesByCountry(c *gin.Context, db *sql.DB) {
-	country := strings.ToUpper(c.Param("countryISO2"))
-	rows, err := db.Query(`SELECT countryISO2, swift_code, bankName, address, country_name, is_headquarter FROM swift_codes WHERE countryISO2 = $1`, country)
+	countryCode := strings.ToUpper(c.Param("countryISO2"))
+	rows, err := db.Query(`SELECT countryISO2, swift_code, bankName, address, country_name, is_headquarter FROM swift_codes WHERE countryISO2 = $1`, countryCode)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database query failed"})
 		return
@@ -62,7 +100,7 @@ func GetSwiftCodesByCountry(c *gin.Context, db *sql.DB) {
 	}
 
 	if len(swiftCodes) == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "No SWIFT codes found for the given country"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "No SWIFT codes found for this country"})
 		return
 	}
 
