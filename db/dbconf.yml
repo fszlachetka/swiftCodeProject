@@ -1,0 +1,4 @@
+development:
+  driver: postgres
+  dsn: "postgres://postgres:postgres@localhost:5432/swiftCodesDatabase?sslmode=disable"
+
