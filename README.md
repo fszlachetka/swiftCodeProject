@@ -2,12 +2,6 @@
 
 ## Description
 SwiftCodeProject is an application I developed in Go to parse, store, and provide access to SWIFT code data through a RESTful API, ensuring efficient querying and retrieval of banking information. It uses PostgreSQL as the database for optimized storage and fast queries.
-
----
-
-## Project Scope
-
-### SWIFT Code Overview
 A SWIFT code (Bank Identifier Code - BIC) uniquely identifies a bank’s branch or headquarters for international wire transfers. Initially stored in an Excel file, this data is now structured and exposed via an API.
 
 ---
